@@ -1,0 +1,162 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user account details and progression.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["AFFILIATE", "ANALYST", "ADMIN"] },
+        "rank": { "type": "string", "enum": ["START", "BLACK", "GOLD", "PLATINUM", "DIAMANTE"] },
+        "points": { "type": "number" },
+        "referredBy": { "type": "string" },
+        "networkPath": { "type": "string" },
+        "socialConnections": {
+          "type": "object",
+          "properties": {
+            "instagram": { "type": "string" },
+            "facebook": { "type": "string" },
+            "whatsapp": { "type": "string" }
+          }
+        },
+        "universityProgress": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "name", "email", "role", "rank", "points", "createdAt"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Detailed client registration for financial analysis.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "cpf": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "maritalStatus": { "type": "string" },
+        "address": { "type": "string" },
+        "occupation": { "type": "string" },
+        "monthlyIncome": { "type": "number" },
+        "hasCNH": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Lead", "Analise", "Aprovado", "Vendido", "Recusado"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "name", "cpf", "phone", "status", "createdAt"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Customer lead registered by an affiliate.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "source": { "type": "string" },
+        "stage": { "type": "string", "enum": ["Novo", "Contatado", "Negociando", "Fechado", "Perdido"] },
+        "status": { "type": "string", "enum": ["Pendente", "Validado", "Convertido", "Descartado"] },
+        "notes": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "name", "phone", "status", "createdAt"]
+    },
+    "TestDrive": {
+      "title": "Test Drive",
+      "description": "Car demonstration schedule.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "leadId": { "type": "string" },
+        "carModel": { "type": "string" },
+        "scheduledAt": { "type": "number" },
+        "status": { "type": "string", "enum": ["Agendado", "Concluído", "Cancelado"] }
+      },
+      "required": ["id", "userId", "leadId", "carModel", "scheduledAt", "status"]
+    },
+    "CreditSimulation": {
+      "title": "Credit Simulation",
+      "description": "Basic credit check request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "cpf": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "phone": { "type": "string" },
+        "hasCNH": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Pending", "Processed"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "cpf", "birthDate", "phone", "hasCNH", "status", "createdAt"]
+    },
+    "CreditRequest": {
+      "title": "Credit Request",
+      "description": "Full formal credit application.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "leadId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Em Análise", "Aprovado", "Reprovado"] },
+        "submittedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "leadId", "amount", "status", "submittedAt"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Scraped vehicle data from partner stores.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "image": { "type": "string" },
+        "brand": { "type": "string" },
+        "year": { "type": "string" },
+        "km": { "type": "string" },
+        "sourceUrl": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "title", "price", "image", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Cached inventory data."
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles by UID."
+    },
+    "/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Global leads collection."
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Financial analysis clients."
+    },
+    "/testDrives/{tdId}": {
+      "schema": "TestDrive",
+      "description": "Global test drives collection."
+    },
+    "/creditSimulations/{simId}": {
+      "schema": "CreditSimulation",
+      "description": "Credit simulations, restricted to analysts."
+    },
+    "/creditRequests/{reqId}": {
+      "schema": "CreditRequest",
+      "description": "Formal credit requests."
+    }
+  }
+}

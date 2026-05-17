@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@300;400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bebas Neue", sans-serif;
+  --font-body: "Poppins", sans-serif;
+
+  --color-brand-red: #E31B23;
+  --color-brand-red-dark: #A71C1C;
+  --color-silver: #C0C0C0;
+  --color-matte-black: #050505;
+  --color-surface: #121212;
+  --color-border-dim: #262626;
+}
+
+@layer base {
+  body {
+    @apply bg-matte-black text-white selection:bg-brand-red selection:text-white antialiased;
+  }
+}
+
+.premium-gradient {
+  background: radial-gradient(circle at 80% 20%, rgba(227, 27, 35, 0.05) 0%, transparent 40%), 
+              radial-gradient(circle at 10% 90%, rgba(192, 192, 192, 0.05) 0%, transparent 40%);
+}
+
+.red-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-red via-white to-brand-red font-semibold;
+}
+
+.glass-card {
+  @apply bg-surface border border-border-dim rounded-2xl;
+}
+
+.badge-glow-red {
+  @apply bg-brand-red shadow-[0_0_10px_#E31B23];
+}
+
+.badge-glow-silver {
+  @apply bg-silver shadow-[0_0_10px_#C0C0C0];
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-red/20 hover:bg-brand-red/40 rounded-full transition-colors;
+}

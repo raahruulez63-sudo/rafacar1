@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function getProfile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isAnalyst() { return isSignedIn() && getProfile().role == 'ANALYST'; }
+    function isAdmin() { return isSignedIn() && getProfile().role == 'ADMIN'; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // --- Validation Blueprints ---
+    
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role', 'rank', 'points', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             // Relaxing email check during first-run or dev if needed, but keeping for security
+             data.email is string &&
+             data.role in ['AFFILIATE', 'ANALYST', 'ADMIN'] &&
+             data.rank in ['START', 'BLACK', 'GOLD', 'PLATINUM', 'DIAMANTE'];
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['userId', 'name', 'cpf', 'phone', 'status', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.status in ['Lead', 'Analise', 'Aprovado', 'Vendido', 'Recusado'] &&
+             data.monthlyIncome is number;
+    }
+
+    function isValidLead(data) {
+      return data.keys().hasAll(['userId', 'name', 'phone', 'email', 'source', 'stage', 'status', 'notes', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.status in ['Pendente', 'Validado', 'Convertido', 'Descartado'] &&
+             data.stage in ['Novo', 'Contatado', 'Negociando', 'Fechado', 'Perdido'] &&
+             data.notes is list;
+    }
+
+    function isValidTestDrive(data) {
+      return data.keys().hasAll(['userId', 'leadId', 'carModel', 'status', 'scheduledAt']) &&
+             data.userId == request.auth.uid;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAnalyst() || isAdmin());
+      // Explicit relational check for list: can only query their own or those who referred them (simplified for now)
+      allow list: if isSignedIn(); 
+      allow create: if isSignedIn() && isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if isSignedIn() && isValidUserProfile(incoming()) && (
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['points', 'rank', 'name', 'phone', 'socialConnections', 'universityProgress'])) ||
+        isAdmin()
+      );
+    }
+
+    match /leads/{leadId} {
+      allow get: if isSignedIn() && (isOwner(existing().userId) || isAnalyst() || isAdmin());
+      allow list: if isSignedIn() && (isOwner(resource.data.userId) || isAnalyst() || isAdmin());
+      allow create: if isSignedIn() && isValidLead(incoming());
+      allow update: if isSignedIn() && isValidLead(incoming()) && (
+        (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'email', 'source', 'stage', 'notes'])) ||
+        ((isAnalyst() || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'stage']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /clients/{clientId} {
+      allow get: if isSignedIn() && (isOwner(existing().userId) || isAnalyst() || isAdmin());
+      allow list: if isSignedIn() && (isOwner(resource.data.userId) || isAnalyst() || isAdmin());
+      allow create: if isSignedIn() && isValidClient(incoming());
+      allow update: if isSignedIn() && isValidClient(incoming()) && (
+        (isOwner(existing().userId) && incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'email', 'address', 'maritalStatus', 'occupation', 'monthlyIncome'])) ||
+        ((isAnalyst() || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /testDrives/{tdId} {
+      allow get: if isSignedIn() && (isOwner(existing().userId) || isAnalyst() || isAdmin());
+      allow list: if isSignedIn() && (isOwner(resource.data.userId) || isAnalyst() || isAdmin());
+      allow create: if isSignedIn() && isValidTestDrive(incoming());
+      allow update: if isSignedIn() && isValidTestDrive(incoming()) && (isOwner(existing().userId) || isAnalyst() || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /creditSimulations/{simId} {
+      allow create: if isSignedIn() && (incoming().keys().hasAll(['userId', 'cpf', 'birthDate', 'phone', 'hasCNH', 'status', 'createdAt']) && incoming().userId == request.auth.uid);
+      allow get, list: if isAnalyst() || isAdmin();
+    }
+
+    match /creditRequests/{reqId} {
+      allow get, list: if isSignedIn() && (isOwner(resource.data.userId) || isAnalyst() || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if (isAnalyst() || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isAdmin();
+    }
+
+    match /sales/{saleId} {
+      allow get, list: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+  }
+}

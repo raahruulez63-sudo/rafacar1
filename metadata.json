@@ -1,0 +1,8 @@
+{
+  "name": "RafaCar Elite Club",
+  "description": "Sistema completo de gestão, recrutamento e treinamento para o programa RAFACAR ELITE CLUB. Inclui Dashboard Elite, Universidade RafaCar com módulos de treinamento, Ficha Cadastral completa, Gerenciamento de Leads com IA, Linhas de Crédito exclusivas e visualização de rede hierárquica.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
