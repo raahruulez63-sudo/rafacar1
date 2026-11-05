@@ -8,11 +8,10 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider
 } from 'firebase/auth';
-import { auth, db } from '../services/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth } from '../services/firebase';
+import { setPendingRegistrationName } from '../context/AuthContext';
 import { UserPlus, LogIn, Mail, Lock, User as UserIcon, Chrome, Facebook, Instagram } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { UserProfile } from '../types';
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -22,21 +21,22 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const createProfileIfNeeded = async (user: any) => {
-    const profileRef = doc(db, 'users', user.uid);
-    const profileSnap = await getDoc(profileRef);
-    
-    if (!profileSnap.exists()) {
-      const profile: UserProfile = {
-        uid: user.uid,
-        name: user.displayName || 'Usuário Elite',
-        email: user.email || '',
-        role: 'AFFILIATE',
-        rank: 'START',
-        points: 0,
-        createdAt: Date.now(),
-      };
-      await setDoc(profileRef, profile);
+  const translateError = (err: any): string => {
+    switch (err?.code) {
+      case 'auth/email-already-in-use': return 'Este email já está cadastrado. Faça login.';
+      case 'auth/invalid-email': return 'Email inválido.';
+      case 'auth/weak-password': return 'A senha deve ter pelo menos 6 caracteres.';
+      case 'auth/missing-password': return 'Informe a senha.';
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found': return 'Email ou senha incorretos.';
+      case 'auth/too-many-requests': return 'Muitas tentativas. Aguarde alguns minutos.';
+      case 'auth/network-request-failed': return 'Falha de conexão. Verifique sua internet.';
+      case 'auth/operation-not-allowed': return 'Cadastro por email não está habilitado no Firebase.';
+      case 'auth/unauthorized-domain': return 'Domínio não autorizado no Firebase Authentication.';
+      case 'auth/popup-closed-by-user': return 'Login cancelado.';
+      case 'auth/popup-blocked': return 'O navegador bloqueou o pop-up de login.';
+      default: return err?.message || 'Ocorreu um erro. Tente novamente.';
     }
   };
 
@@ -45,10 +45,9 @@ export default function Login() {
     setError('');
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      await createProfileIfNeeded(result.user);
+      await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setError(err.message);
+      setError(translateError(err));
     } finally {
       setLoading(false);
     }
@@ -59,10 +58,9 @@ export default function Login() {
     setError('');
     const provider = new FacebookAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      await createProfileIfNeeded(result.user);
+      await signInWithPopup(auth, provider);
     } catch (err: any) {
-      setError(err.message);
+      setError(translateError(err));
     } finally {
       setLoading(false);
     }
@@ -74,31 +72,31 @@ export default function Login() {
     setError('');
 
     try {
-      let finalEmail = email;
-      if (email.toLowerCase() === 'rafacar93') {
+      let finalEmail = email.trim();
+      if (finalEmail.toLowerCase() === 'rafacar93') {
         finalEmail = 'rafacar93@elite.com';
       }
 
       if (isRegistering) {
+        if (!name.trim()) {
+          setError('Informe seu nome completo.');
+          return;
+        }
+        if (password.length < 6) {
+          setError('A senha deve ter pelo menos 6 caracteres.');
+          return;
+        }
+        // The profile document is created by the auth listener (AuthContext)
+        // using this name, avoiding a duplicate write that the rules reject.
+        setPendingRegistrationName(name);
         const userCredential = await createUserWithEmailAndPassword(auth, finalEmail, password);
-        await updateProfile(userCredential.user, { displayName: name });
-        
-        const isAnalystAccount = finalEmail === 'rafacar93@elite.com';
-        const profile: UserProfile = {
-          uid: userCredential.user.uid,
-          name,
-          email: finalEmail,
-          role: isAnalystAccount ? 'ANALYST' : 'AFFILIATE',
-          rank: 'START',
-          points: 0,
-          createdAt: Date.now(),
-        };
-        await setDoc(doc(db, 'users', userCredential.user.uid), profile);
+        await updateProfile(userCredential.user, { displayName: name.trim() }).catch(() => {});
       } else {
         await signInWithEmailAndPassword(auth, finalEmail, password);
       }
     } catch (err: any) {
-      setError(err.message);
+      setPendingRegistrationName(null);
+      setError(translateError(err));
     } finally {
       setLoading(false);
     }
@@ -181,8 +179,9 @@ export default function Login() {
               <Mail size={10} /> Email
             </label>
             <input 
-              type="email" 
+              type={isRegistering ? 'email' : 'text'}
               required
+              autoComplete={isRegistering ? 'email' : 'username'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none focus:border-brand-red/50 transition-all"
@@ -197,6 +196,8 @@ export default function Login() {
             <input 
               type="password" 
               required
+              minLength={isRegistering ? 6 : undefined}
+              autoComplete={isRegistering ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm outline-none focus:border-brand-red/50 transition-all"
@@ -221,7 +222,7 @@ export default function Login() {
 
         <div className="mt-8 pt-8 border-t border-white/5 text-center">
           <button 
-            onClick={() => setIsRegistering(!isRegistering)}
+            onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
             className="text-[10px] text-brand-red uppercase tracking-[0.3em] font-bold hover:text-white transition-colors flex items-center gap-2 mx-auto"
           >
             {isRegistering ? <LogIn size={10} /> : <UserPlus size={10} />}
