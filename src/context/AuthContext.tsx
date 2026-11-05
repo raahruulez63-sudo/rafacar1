@@ -12,6 +12,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Name typed in the registration form. Set right before the account is created so the
+// auth listener (the single place that creates the Firestore profile) can use it.
+let pendingRegistrationName: string | null = null;
+export const setPendingRegistrationName = (name: string | null) => {
+  pendingRegistrationName = name;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -21,26 +28,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       setUser(authUser);
       if (authUser) {
-        const profileRef = doc(db, 'users', authUser.uid);
-        const profileSnap = await getDoc(profileRef);
-        
-        if (profileSnap.exists()) {
-          setProfile(profileSnap.data() as UserProfile);
-        } else {
-          // Create a default profile if it doesn't exist (e.g. first time login)
-          // Usually we handle this in a registration flow, but keep it robust here
-          const isAnalystAccount = authUser.email === 'rafacar93@elite.com';
-          const newProfile: UserProfile = {
-            uid: authUser.uid,
-            name: authUser.displayName || 'Usuário Elite',
-            email: authUser.email || '',
-            role: isAnalystAccount ? 'ANALYST' : 'AFFILIATE',
-            rank: 'START',
-            points: 0,
-            createdAt: Date.now(),
-          };
-          await setDoc(profileRef, newProfile);
-          setProfile(newProfile);
+        try {
+          const profileRef = doc(db, 'users', authUser.uid);
+          const profileSnap = await getDoc(profileRef);
+
+          if (profileSnap.exists()) {
+            setProfile(profileSnap.data() as UserProfile);
+          } else {
+            // First login / just registered: create the profile once, here.
+            const isAnalystAccount = authUser.email === 'rafacar93@elite.com';
+            const newProfile: UserProfile = {
+              uid: authUser.uid,
+              name: pendingRegistrationName?.trim() || authUser.displayName || 'Usuário Elite',
+              email: authUser.email || '',
+              role: isAnalystAccount ? 'ANALYST' : 'AFFILIATE',
+              rank: 'START',
+              points: 0,
+              createdAt: Date.now(),
+            };
+            pendingRegistrationName = null;
+            await setDoc(profileRef, newProfile);
+            setProfile(newProfile);
+          }
+        } catch (err) {
+          console.error('Erro ao carregar/criar perfil:', err);
+          setProfile(null);
         }
       } else {
         setProfile(null);
